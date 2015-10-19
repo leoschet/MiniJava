@@ -1,0 +1,194 @@
+package miniJava.parser;
+
+import java_cup.runtime.*;
+import java.io.IOException;
+import java.nio.file.Path;
+import miniJava.astree.*;
+import miniJava.lexer.Lexer;
+
+parser code {:
+    private Lexer _Lexer;
+
+    private Path filePath;
+
+    public Parser(Path filePath) throws IOException {
+        this.filePath = filePath;
+
+        ComplexSymbolFactory cSymFac = new ComplexSymbolFactory();
+
+        super.symbolFactory = symbolFactory;
+
+        _Lexer = new Lexer(filePath, cSymFac);
+    }
+:}
+
+init with {: :};
+
+scan with {:
+    return _Lexer.next_token();
+:};
+
+// Terminais sem valores associados
+terminal CLASS, PUBLIC, EXTENDS, STATIC, VOID, INT, BOOL, WHILE, IF, ELSE, RETURN, THIS, NEW,
+         SEMICOLON, DOT, COMMA, ASS, O_PAR, C_PAR, O_BRACE, C_BRACE, O_BRACKET, C_BRACKET,
+         OR, AND, EQUAL, N_EQUAL, LESS, L_EQUAL, GREATER, G_EQUAL, PLUS, MINUS, TIMES, SLASH, MOD, NEG;
+
+terminal MAIN, STRING, SYSO, LENGTH;
+
+// Terminais com valores associados
+terminal Boolean FALSE, TRUE;
+terminal Integer INTEGER;
+terminal Double DOUBLE;
+terminal String ID;
+
+// Nao terminais
+non terminal Program program;
+non terminal MainClassDeclaration mainClass;
+non terminal ClassListDeclaration classList;
+non terminal ClassDeclaration classDeclaration;
+non terminal Extends ext;
+non terminal InnerClass innerClass;
+non terminal VariableListDeclaration varList;
+non terminal VariableDeclaration varDeclaration;
+non terminal MethodListDeclaration methodList;
+non terminal MethodDeclaration methodDeclaration;
+non terminal DataType dataType;
+non terminal ParameterListDeclaration paramList;
+non terminal Parameters params;
+non terminal ParameterDeclaration paramDeclaration;
+non terminal InnerMethod innerMethod;
+non terminal StatementList stmtList;
+non terminal Statement stmt;
+non terminal Expression expr;
+non terminal Operators operators;
+non terminal ArgumentListDeclaration argList;
+non terminal ArgumentDeclaration argDeclaration;
+
+/* Regras de precedencia
+
+    ex.: (ASSIGNEE) a = b = c
+    eh associativo a direita,
+    fazendo que a expressao mais a direita
+    seja avaliada primeiro,
+    podendo alimentar varias variaveis com o mesmo valor
+*/
+
+precedence right ASS;
+
+precedence left AND, OR;
+
+precedence right NEG;
+
+precedence nonassoc EQUAL, N_EQUAL, LESS, L_EQUAL, GREATER, G_EQUAL;
+
+precedence left PLUS, MINUS;
+precedence left TIMES, SLASH, MOD;
+
+precedence nonassoc ID;
+
+precedence left DOT;
+
+precedence right NEW;
+
+// Gramatica
+program             ::= mainClass:mc classList:cl {: RESULT = new Program(mc, cl); :}
+                    ;
+
+mainClass           ::= CLASS ID:cId O_BRACE PUBLIC STATIC VOID MAIN O_PAR STRING O_BRACKET C_BRACKET ID C_PAR O_BRACE innerMethod:im C_BRACE C_BRACE {: RESULT = new MainClassDeclaration(cId, im); :}
+                    ;
+
+classList           ::= classDeclaration:cd classList:cl    {: RESULT = new ClassListDeclaration(cd, cl); :}
+                        |                                   {: RESULT = null; :}
+                    ;
+
+classDeclaration    ::= CLASS ID:cId ext:ext O_BRACE innerClass:ic C_BRACE {: RESULT = new ClassDeclaration(cId, ext, ic); :}
+                    ;
+
+ext                 ::= EXTENDS ID:id   {: RESULT = new Extends(id); :}
+                        |               {: RESULT = null; :}
+                    ;
+
+innerClass          ::= varList:vl methodList:ml    {: RESULT = new InnerClass(vl, ml); :}
+                    ;
+
+varList             ::= varList:vl varDeclaration:vd    {: RESULT = new VariableListDeclaration(vl, vd); :}
+                        |                               {: RESULT = null; :}
+                    ;
+
+varDeclaration      ::= dataType:dt ID:id SEMICOLON   {: RESULT = new VariableDeclaration(dt, id); :}
+                    ;
+
+methodList          ::= methodList:ml methodDeclaration:md  {: RESULT = new MethodListDeclaration(ml, md); :}
+                        |                                   {: RESULT = null; :}
+                    ;
+
+methodDeclaration   ::= PUBLIC dataType:dt ID:mId O_PAR paramList:pl C_PAR O_BRACE innerMethod:im RETURN expr:expr SEMICOLON C_BRACE    {: RESULT = new MethodDeclaration(dt, mId, pl, im, expr); :}
+                    ;
+
+dataType            ::= INT                         {: RESULT = new IntType(); :}
+                        | INT O_BRACKET C_BRACKET   {: RESULT = new IntArrayType(); :}
+                        | BOOL                      {: RESULT = new BoolType(); :}
+                        | ID:name                   {: RESULT = new IdType(name); :}
+                    ;
+
+paramList           ::= params:p    {: RESULT = new ParameterListDeclaration(p); :}
+                        |           {: RESULT = null; :}
+                    ;
+
+params              ::= paramDeclaration:pd             {: RESULT = new Parameters(pd, null); :}
+                        | paramDeclaration:pd COMMA params:p {: RESULT = new Parameters(pd, p); :}
+                    ;
+
+paramDeclaration    ::= dataType:dt ID:id   {: RESULT = new ParameterDeclaration(dt, id); :}
+                    ;
+
+innerMethod         ::= varList:vl stmtList:sl  {: RESULT = new InnerMethod(vl, sl); :}
+                    ;
+
+stmtList            ::= stmtList:sl stmt:s  {: RESULT = new StatementList(sl, s); :}
+                        |                   {: RESULT = null; :}
+                    ;
+
+stmt                ::= O_BRACE stmtList:sl O_BRACE                                     {: RESULT = new BraceStatement(sl); :}
+                        | IF O_PAR expr:expr C_PAR stmt:ifStmt ELSE stmt:elseStmt       {: RESULT = new IfElseStatement(expr, ifStmt, elseStmt); :}
+                        | WHILE O_PAR expr:expr C_PAR stmt:stmt                         {: RESULT = new WhileStatement(expr, stmt); :}
+                        | SYSO O_PAR expr:expr C_PAR SEMICOLON                          {: RESULT = new SysoStatement(expr); :}
+                        | ID:id ASS expr:expr SEMICOLON                                 {: RESULT = new AssStatement(id, expr); :}
+                        | ID:id O_BRACKET expr:expr C_BRACKET ASS expr:assExpr SEMICOLON  {: RESULT = new ArrayAssStatement(id, expr, assExpr); :}
+                    ;
+
+expr                ::= expr:l AND expr:r                           {: RESULT = new BinaryBooleanExpression(l, BinaryBooleanExpression.Operator.AND, r); :}
+                        | expr:l OR expr:r                          {: RESULT = new BinaryBooleanExpression(l, BinaryBooleanExpression.Operator.OR, r); :}
+                        | expr:l EQUAL expr:r                       {: RESULT = new BinaryBooleanExpression(l, BinaryBooleanExpression.Operator.EQUAL, r); :}
+                        | expr:l N_EQUAL expr:r                     {: RESULT = new BinaryBooleanExpression(l, BinaryBooleanExpression.Operator.N_EQUAL, r); :}
+                        | expr:l LESS expr:r                        {: RESULT = new BinaryBooleanExpression(l, BinaryBooleanExpression.Operator.LESS, r); :}
+                        | expr:l L_EQUAL expr:r                     {: RESULT = new BinaryBooleanExpression(l, BinaryBooleanExpression.Operator.L_EQUAL, r); :}
+                        | expr:l GREATER expr:r                     {: RESULT = new BinaryBooleanExpression(l, BinaryBooleanExpression.Operator.GREATER, r); :}
+                        | expr:l G_EQUAL expr:r                     {: RESULT = new BinaryBooleanExpression(l, BinaryBooleanExpression.Operator.G_EQUAL, r); :}
+                        | expr:l PLUS expr:r                        {: RESULT = new BinaryBooleanExpression(l, BinaryBooleanExpression.Operator.PLUS, r); :}
+                        | expr:l MINUS expr:r                       {: RESULT = new BinaryBooleanExpression(l, BinaryBooleanExpression.Operator.MINUS, r); :}
+                        | expr:l TIMES expr:r                       {: RESULT = new BinaryBooleanExpression(l, BinaryBooleanExpression.Operator.TIMES, r); :}
+                        | expr:l SLASH expr:r                       {: RESULT = new BinaryBooleanExpression(l, BinaryBooleanExpression.Operator.SLASH, r); :}
+                        | expr:l MOD expr:r                         {: RESULT = new BinaryBooleanExpression(l, BinaryBooleanExpression.Operator.MOD, r); :}
+                        | NEG expr:e                                {: RESULT = new UnaryBooleanExpression(UnaryBooleanExpression.Operator.NEG, e); :}
+                        | expr:a O_BRACKET expr:i C_BRACKET         {: RESULT = new ArrayAccessExpression(a, i); :}
+                        | expr:a DOT LENGTH                         {: RESULT = new LengthExpression(a); :}
+                        | expr:o DOT ID:m O_PAR argList:al C_PAR    {: RESULT = new FunctionExpression(o, m, al); :}
+                        | INTEGER:i                                 {: RESULT = new LiteralIntegerExpression(i); :}
+                        | DOUBLE:d                                  {: RESULT = new LiteralDoubleExpression(d); :}
+                        | FALSE:f                                   {: RESULT = new LiteralBooleanExpression(f); :}
+                        | TRUE:t                                    {: RESULT = new LiteralBooleanExpression(t); :}
+                        | ID:id                                     {: RESULT = new IdentifierExpression(id); :}
+                        | THIS                                      {: RESULT = new ThisExpression(); :}
+                        | NEW INT O_BRACKET expr:expr C_BRACKET     {: RESULT = new IntegerArrayCreationExpression(expr); :}
+                        | NEW ID:id O_PAR C_PAR                     {: RESULT = new ObjectCreationExpression(id); :}
+                        | O_PAR expr:expr C_PAR                     {: RESULT = new AssocExpression(expr); :}
+                    ;
+
+argList             ::= argDeclaration:ad   {: RESULT = new ArgumentListDeclaration(ad); :}
+                        |                   {: RESULT = null; :}
+                    ;
+
+argDeclaration      ::= expr:expr COMMA argDeclaration:arg   {: RESULT = new ArgumentDeclaration(expr, arg); :}
+                        | expr                               {: RESULT = null; :}
+                    ;
