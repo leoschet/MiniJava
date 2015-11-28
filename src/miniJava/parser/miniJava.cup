@@ -4,6 +4,19 @@ import java_cup.runtime.*;
 import java.io.IOException;
 import java.nio.file.Path;
 import miniJava.astree.*;
+import miniJava.astree.declaration.classDeclaration.*;
+import miniJava.astree.declaration.methodDeclaration.*;
+import miniJava.astree.declaration.variableDeclaration.*;
+import miniJava.astree.expression.*;
+import miniJava.astree.expression.array.*;
+import miniJava.astree.expression.bool.*;
+import miniJava.astree.expression.identifier.*;
+import miniJava.astree.expression.integer.*;
+import miniJava.astree.program.*;
+import miniJava.astree.statement.*;
+import miniJava.astree.type.*;
+import miniJava.astree.type.nonPrimitive.*;
+import miniJava.astree.type.primitive.*;
 import miniJava.lexer.Lexer;
 
 parser code {:
@@ -31,38 +44,34 @@ scan with {:
 // Terminais sem valores associados
 terminal CLASS, PUBLIC, EXTENDS, STATIC, VOID, INT, BOOL, WHILE, IF, ELSE, RETURN, THIS, NEW,
          SEMICOLON, DOT, COMMA, ASS, O_PAR, C_PAR, O_BRACE, C_BRACE, O_BRACKET, C_BRACKET,
-         OR, AND, EQUAL, N_EQUAL, LESS, L_EQUAL, GREATER, G_EQUAL, PLUS, MINUS, TIMES, SLASH, MOD, NEG;
+         OR, AND, EQUAL, N_EQUAL, LESS, L_EQUAL, GREATER, G_EQUAL, PLUS, MINUS, TIMES, DIV, MOD, NEG;
 
 terminal MAIN, STRING, SYSO, LENGTH;
 
 // Terminais com valores associados
 terminal Boolean FALSE, TRUE;
 terminal Integer INTEGER;
-terminal Double DOUBLE;
 terminal String ID;
 
 // Nao terminais
 non terminal Program program;
 non terminal MainClassDeclaration mainClass;
 non terminal ClassListDeclaration classList;
-non terminal ClassDeclaration classDeclaration;
-non terminal Extends ext;
-non terminal InnerClass innerClass;
+non terminal IClassDeclaration classDeclaration;
 non terminal VariableListDeclaration varList;
 non terminal VariableDeclaration varDeclaration;
 non terminal MethodListDeclaration methodList;
 non terminal MethodDeclaration methodDeclaration;
-non terminal DataType dataType;
-non terminal ParameterListDeclaration paramList;
-non terminal Parameters params;
-non terminal ParameterDeclaration paramDeclaration;
-non terminal InnerMethod innerMethod;
+non terminal IDataType dataType;
+non terminal ArgListDeclaration argList;
+non terminal ArgListDeclaration args;
+non terminal ArgDeclaration argDeclaration;
+non terminal String ext;
 non terminal StatementList stmtList;
-non terminal Statement stmt;
-non terminal Expression expr;
-non terminal Operators operators;
-non terminal ArgumentListDeclaration argList;
-non terminal ArgumentDeclaration argDeclaration;
+non terminal IStatement stmt;
+non terminal ExpressionList paramList;
+non terminal ExpressionList paramDeclaration;
+non terminal IExpression expr;
 
 /* Regras de precedencia
 
@@ -82,7 +91,7 @@ precedence right NEG;
 precedence nonassoc EQUAL, N_EQUAL, LESS, L_EQUAL, GREATER, G_EQUAL;
 
 precedence left PLUS, MINUS;
-precedence left TIMES, SLASH, MOD;
+precedence left TIMES, DIV, MOD;
 
 precedence nonassoc ID;
 
@@ -94,35 +103,32 @@ precedence right NEW;
 program             ::= mainClass:mc classList:cl {: RESULT = new Program(mc, cl); :}
                     ;
 
-mainClass           ::= CLASS ID:cId O_BRACE PUBLIC STATIC VOID MAIN O_PAR STRING O_BRACKET C_BRACKET ID C_PAR O_BRACE innerMethod:im C_BRACE C_BRACE {: RESULT = new MainClassDeclaration(cId, im); :}
+mainClass           ::= CLASS ID:cId O_BRACE PUBLIC STATIC VOID MAIN O_PAR STRING O_BRACKET C_BRACKET ID C_PAR O_BRACE stmtList:stmts C_BRACE C_BRACE {: RESULT = new MainClassDeclaration(cId, stmts); :}
                     ;
 
-classList           ::= classDeclaration:cd classList:cl    {: RESULT = new ClassListDeclaration(cd, cl); :}
-                        |                                   {: RESULT = null; :}
+classList           ::= classList:cl classDeclaration:cd    {: cl.add(cd); RESULT = cl; :}
+                        |                                   {: RESULT = new ClassListDeclaration(); :}
                     ;
 
-classDeclaration    ::= CLASS ID:cId ext:ext O_BRACE innerClass:ic C_BRACE {: RESULT = new ClassDeclaration(cId, ext, ic); :}
+classDeclaration    ::= CLASS ID:cId ext:ext O_BRACE varList:vl methodList:ml C_BRACE {: if (ext == null) RESULT = new SimpleClassDeclaration(cId, vl, ml); else RESULT = new ExtendedClassDeclaration(cId, vl, ml, ext); :}
                     ;
 
-ext                 ::= EXTENDS ID:id   {: RESULT = new Extends(id); :}
+ext                 ::= EXTENDS ID:id   {: RESULT = id; :}
                         |               {: RESULT = null; :}
                     ;
 
-innerClass          ::= varList:vl methodList:ml    {: RESULT = new InnerClass(vl, ml); :}
-                    ;
-
-varList             ::= varList:vl varDeclaration:vd    {: RESULT = new VariableListDeclaration(vl, vd); :}
-                        |                               {: RESULT = null; :}
+varList             ::= varList:vl varDeclaration:vd    {: vl.add(vd); RESULT = vl; :}
+                        |                               {: RESULT = new VariableListDeclaration(); :}
                     ;
 
 varDeclaration      ::= dataType:dt ID:id SEMICOLON   {: RESULT = new VariableDeclaration(dt, id); :}
                     ;
 
-methodList          ::= methodList:ml methodDeclaration:md  {: RESULT = new MethodListDeclaration(ml, md); :}
-                        |                                   {: RESULT = null; :}
+methodList          ::= methodList:ml methodDeclaration:md  {: ml.add(md); RESULT = ml; :}
+                        |                                   {: RESULT = new MethodListDeclaration(); :}
                     ;
 
-methodDeclaration   ::= PUBLIC dataType:dt ID:mId O_PAR paramList:pl C_PAR O_BRACE innerMethod:im RETURN expr:expr SEMICOLON C_BRACE    {: RESULT = new MethodDeclaration(dt, mId, pl, im, expr); :}
+methodDeclaration   ::= PUBLIC dataType:dt ID:mId O_PAR argList:pl C_PAR O_BRACE varList:vl stmtList:sl RETURN expr:expr SEMICOLON C_BRACE    {: RESULT = new MethodDeclaration(dt, mId, pl, vl, sl, expr); :}
                     ;
 
 dataType            ::= INT                         {: RESULT = new IntType(); :}
@@ -131,25 +137,22 @@ dataType            ::= INT                         {: RESULT = new IntType(); :
                         | ID:name                   {: RESULT = new IdType(name); :}
                     ;
 
-paramList           ::= params:p    {: RESULT = new ParameterListDeclaration(p); :}
-                        |           {: RESULT = null; :}
+argList           ::= args:p    {: RESULT = p; :}
+                        |           {: RESULT = new ArgListDeclaration(); :}
                     ;
 
-params              ::= paramDeclaration:pd             {: RESULT = new Parameters(pd, null); :}
-                        | paramDeclaration:pd COMMA params:p {: RESULT = new Parameters(pd, p); :}
+args              ::= argDeclaration:pd             {: RESULT = new ArgListDeclaration(); RESULT.add(pd); :}
+                        | args:pd COMMA argDeclaration:p {: pd.add(p); RESULT = pd; :}
                     ;
 
-paramDeclaration    ::= dataType:dt ID:id   {: RESULT = new ParameterDeclaration(dt, id); :}
+argDeclaration    ::= dataType:dt ID:id   {: RESULT = new ArgDeclaration(dt, id); :}
                     ;
 
-innerMethod         ::= varList:vl stmtList:sl  {: RESULT = new InnerMethod(vl, sl); :}
+stmtList            ::= stmt:s stmtList:sl {: sl.add(s); RESULT = sl; :}
+                        |                   {: RESULT = new StatementList(); :}
                     ;
 
-stmtList            ::= stmtList:sl stmt:s  {: RESULT = new StatementList(sl, s); :}
-                        |                   {: RESULT = null; :}
-                    ;
-
-stmt                ::= O_BRACE stmtList:sl O_BRACE                                     {: RESULT = new BraceStatement(sl); :}
+stmt                ::= O_BRACE stmtList:sl C_BRACE                                     {: RESULT = new BraceStatement(sl); :}
                         | IF O_PAR expr:expr C_PAR stmt:ifStmt ELSE stmt:elseStmt       {: RESULT = new IfElseStatement(expr, ifStmt, elseStmt); :}
                         | WHILE O_PAR expr:expr C_PAR stmt:stmt                         {: RESULT = new WhileStatement(expr, stmt); :}
                         | SYSO O_PAR expr:expr C_PAR SEMICOLON                          {: RESULT = new SysoStatement(expr); :}
@@ -165,30 +168,29 @@ expr                ::= expr:l AND expr:r                           {: RESULT = 
                         | expr:l L_EQUAL expr:r                     {: RESULT = new BinaryBooleanExpression(l, BinaryBooleanExpression.Operator.L_EQUAL, r); :}
                         | expr:l GREATER expr:r                     {: RESULT = new BinaryBooleanExpression(l, BinaryBooleanExpression.Operator.GREATER, r); :}
                         | expr:l G_EQUAL expr:r                     {: RESULT = new BinaryBooleanExpression(l, BinaryBooleanExpression.Operator.G_EQUAL, r); :}
-                        | expr:l PLUS expr:r                        {: RESULT = new BinaryBooleanExpression(l, BinaryBooleanExpression.Operator.PLUS, r); :}
-                        | expr:l MINUS expr:r                       {: RESULT = new BinaryBooleanExpression(l, BinaryBooleanExpression.Operator.MINUS, r); :}
-                        | expr:l TIMES expr:r                       {: RESULT = new BinaryBooleanExpression(l, BinaryBooleanExpression.Operator.TIMES, r); :}
-                        | expr:l SLASH expr:r                       {: RESULT = new BinaryBooleanExpression(l, BinaryBooleanExpression.Operator.SLASH, r); :}
-                        | expr:l MOD expr:r                         {: RESULT = new BinaryBooleanExpression(l, BinaryBooleanExpression.Operator.MOD, r); :}
+                        | expr:l PLUS expr:r                        {: RESULT = new BinaryIntegerExpression(l, BinaryIntegerExpression.Operator.PLUS, r); :}
+                        | expr:l MINUS expr:r                       {: RESULT = new BinaryIntegerExpression(l, BinaryIntegerExpression.Operator.MINUS, r); :}
+                        | expr:l TIMES expr:r                       {: RESULT = new BinaryIntegerExpression(l, BinaryIntegerExpression.Operator.TIMES, r); :}
+                        | expr:l DIV expr:r                       {: RESULT = new BinaryIntegerExpression(l, BinaryIntegerExpression.Operator.DIV, r); :}
+                        | expr:l MOD expr:r                         {: RESULT = new BinaryIntegerExpression(l, BinaryIntegerExpression.Operator.MOD, r); :}
                         | NEG expr:e                                {: RESULT = new UnaryBooleanExpression(UnaryBooleanExpression.Operator.NEG, e); :}
                         | expr:a O_BRACKET expr:i C_BRACKET         {: RESULT = new ArrayAccessExpression(a, i); :}
                         | expr:a DOT LENGTH                         {: RESULT = new LengthExpression(a); :}
-                        | expr:o DOT ID:m O_PAR argList:al C_PAR    {: RESULT = new FunctionExpression(o, m, al); :}
+                        | expr:o DOT ID:m O_PAR paramList:al C_PAR    {: RESULT = new MethodCallExpression(o, m, al); :}
                         | INTEGER:i                                 {: RESULT = new LiteralIntegerExpression(i); :}
-                        | DOUBLE:d                                  {: RESULT = new LiteralDoubleExpression(d); :}
                         | FALSE:f                                   {: RESULT = new LiteralBooleanExpression(f); :}
                         | TRUE:t                                    {: RESULT = new LiteralBooleanExpression(t); :}
                         | ID:id                                     {: RESULT = new IdentifierExpression(id); :}
                         | THIS                                      {: RESULT = new ThisExpression(); :}
-                        | NEW INT O_BRACKET expr:expr C_BRACKET     {: RESULT = new IntegerArrayCreationExpression(expr); :}
+                        | NEW INT O_BRACKET expr:expr C_BRACKET     {: RESULT = new ArrayCreationExpression(expr); :}
                         | NEW ID:id O_PAR C_PAR                     {: RESULT = new ObjectCreationExpression(id); :}
-                        | O_PAR expr:expr C_PAR                     {: RESULT = new AssocExpression(expr); :}
+                        | O_PAR expr:expr C_PAR                     {: RESULT = expr; :}
                     ;
 
-argList             ::= argDeclaration:ad   {: RESULT = new ArgumentListDeclaration(ad); :}
-                        |                   {: RESULT = null; :}
+paramList             ::= paramDeclaration:ad   {: RESULT = ad; :}
+                        |                   {: RESULT = new ExpressionList(); :}
                     ;
 
-argDeclaration      ::= expr:expr COMMA argDeclaration:arg   {: RESULT = new ArgumentDeclaration(expr, arg); :}
-                        | expr                               {: RESULT = null; :}
+paramDeclaration      ::= expr:expr COMMA paramDeclaration:params   {: params.add(expr); RESULT = params; :}
+                        | expr:expr                               {: RESULT = new ExpressionList(); RESULT.add(expr); :}
                     ;

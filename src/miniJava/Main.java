@@ -1,5 +1,9 @@
+import miniJava.astree.INode;
+import miniJava.parser.Parser;
 import miniJava.util.Gen;
+import miniJava.visitor.PrettyPrintVisitor;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
@@ -15,7 +19,17 @@ public class Main {
     static final Path TEST_FILES_DIR = Paths.get("test");
 
     public static void main(String[] args) throws Exception {
-        gen();
+        //gen();
+
+        //Testando
+        for (Path p: Files.newDirectoryStream(TEST_FILES_DIR)) {
+            INode program = (INode) new Parser(p).parse().value;
+
+            PrettyPrintVisitor visitor  = new PrettyPrintVisitor();
+            StringBuilder str = program.accept(visitor);
+
+            System.out.print(str);
+        }
     }
 
     /**

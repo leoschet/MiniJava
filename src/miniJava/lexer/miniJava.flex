@@ -59,7 +59,6 @@ mlcomment   = \/\*([^\*]|[\r\n]|(\*+([^\*\/]|[\r\n])))*\*+\/
 
 wspace      = {space}|{endline}
 integer     = 0|-?[1-9]({digit})*
-double       = {integer}\.{digit}+((e|E){integer})?
 id          = ({char}|_)({char}|{digit}|_)*
 comment     = {slcomment}|{mlcomment}s
 
@@ -178,7 +177,7 @@ new
 { return symbolFactory.newSymbol("TIMES", TIMES); }
 
 "/"
-{ return symbolFactory.newSymbol("SLASH", SLASH); }
+{ return symbolFactory.newSymbol("DIV", DIV); }
 
 "%"
 { return symbolFactory.newSymbol("MOD", MOD); }
@@ -200,9 +199,6 @@ length
 
 {integer}
 { return symbolFactory.newSymbol("INTEGER", INTEGER, Integer.parseInt(yytext())); }
-
-{double}
-{ return symbolFactory.newSymbol("DOUBLE", DOUBLE, Double.parseDouble(yytext())); }
 
 {id}
 { return symbolFactory.newSymbol("ID", ID, yytext()); }

@@ -10,8 +10,6 @@ public interface Tokens {
   /* terminals */
   public static final int O_PAR = 19;
   public static final int C_BRACKET = 24;
-  public static final int SLASH = 36;
-  public static final int DOUBLE = 46;
   public static final int INTEGER = 45;
   public static final int GREATER = 31;
   public static final int INT = 7;
@@ -26,11 +24,12 @@ public interface Tokens {
   public static final int BOOL = 8;
   public static final int COMMA = 17;
   public static final int CLASS = 2;
+  public static final int DIV = 36;
   public static final int PLUS = 33;
   public static final int MAIN = 39;
   public static final int IF = 10;
   public static final int THIS = 13;
-  public static final int ID = 47;
+  public static final int ID = 46;
   public static final int DOT = 16;
   public static final int EOF = 0;
   public static final int RETURN = 12;
@@ -93,7 +92,7 @@ public interface Tokens {
   "PLUS",
   "MINUS",
   "TIMES",
-  "SLASH",
+  "DIV",
   "MOD",
   "NEG",
   "MAIN",
@@ -103,7 +102,6 @@ public interface Tokens {
   "FALSE",
   "TRUE",
   "INTEGER",
-  "DOUBLE",
   "ID"
   };
 }
